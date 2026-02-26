@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TRAP QUIZ — HOST</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&display=swap');
+
+:root {
+  --bg: #050505;
+  --gold: #d4a843;
+  --green: #00ff88;
+  --red: #ff2d55;
+  --blue: #00bfff;
+  --white: #f0ece4;
+  --dim: rgba(240,236,228,0.4);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: 'Space Mono', monospace;
+  min-height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+
+/* SCANLINES */
+body::after {
+  content:'';
+  position:fixed;
+  inset:0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  pointer-events:none;
+  z-index:9998;
+}
+
+/* SCREENS */
+.screen { display:none; width:100vw; height:100vh; position:absolute; inset:0; }
+.screen.active { display:flex; flex-direction:column; }
+
+/* ===== SETUP SCREEN ===== */
+#setup-screen {
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding:2rem;
+  background: radial-gradient(ellipse at 50% 0%, rgba(212,168,67,0.1) 0%, transparent 60%);
+}
+
+.setup-logo {
+  font-family:'Bebas Neue',cursive;
+  font-size: clamp(3rem, 10vw, 8rem);
+  line-height:0.9;
+  margin-bottom:1rem;
+  background: linear-gradient(135deg, var(--gold), var(--red));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.setup-sub {
+  font-size:0.7rem;
+  letter-spacing:0.4em;
+  text-transform:uppercase;
+  color:var(--dim);
+  margin-bottom:3rem;
+}
+
+.config-box {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding:2rem;
+  max-width:500px;
+  width:100%;
+  margin-bottom:2rem;
+}
+
+.config-label {
+  font-size:0.6rem;
+  letter-spacing:0.3em;
+  text-transform:uppercase;
+  color:var(--dim);
+  margin-bottom:0.5rem;
+  text-align:left;
+}
+
+.config-input {
+  width:100%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.15);
+  color:var(--white);
+  font-family:'Space Mono',monospace;
+  font-size:0.8rem;
+  padding:0.75rem 1rem;
+  margin-bottom:1rem;
+  outline:none;
+  transition: border-color 0.2s;
+}
+.config-input:focus { border-color: var(--gold); }
+.config-input::placeholder { color: rgba(255,255,255,0.2); }
+
+.btn-start {
+  background: var(--gold);
+  color: var(--bg);
+  border:none;
+  font-family:'Bebas Neue',cursive;
+  font-size:1.8rem;
+  padding:0.8rem 3rem;
+  cursor:pointer;
+  letter-spacing:0.1em;
+  transition: all 0.2s;
+  width:100%;
+}
+.btn-start:hover { background:#e8b84f; transform:translateY(-2px); }
+.btn-start:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+
+/* ===== LOBBY SCREEN ===== */
+#lobby-screen {
+  padding:3rem;
+  background: radial-gradient(ellipse at 50% 0%, rgba(0,255,136,0.06) 0%, transparent 60%);
+}
+
+.lobby-header {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  margin-bottom:3rem;
+}
+
+.lobby-title {
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(2rem,5vw,4rem);
+  line-height:1;
+}
+
+.lobby-code-box {
+  text-align:center;
+}
+
+.lobby-code-label {
+  font-size:0.55rem;
+  letter-spacing:0.4em;
+  text-transform:uppercase;
+  color:var(--dim);
+  margin-bottom:0.3rem;
+}
+
+.lobby-code {
+  font-family:'Bebas Neue',cursive;
+  font-size:3rem;
+  color:var(--green);
+  letter-spacing:0.2em;
+}
+
+.lobby-url {
+  font-size:0.55rem;
+  color:var(--dim);
+  word-break:break-all;
+  max-width:300px;
+}
+
+.players-section-title {
+  font-size:0.6rem;
+  letter-spacing:0.4em;
+  text-transform:uppercase;
+  color:var(--dim);
+  margin-bottom:1.5rem;
+}
+
+.players-grid {
+  display:flex;
+  flex-wrap:wrap;
+  gap:0.75rem;
+  flex:1;
+  align-content:flex-start;
+}
+
+.player-chip {
+  background: rgba(0,255,136,0.08);
+  border: 1px solid rgba(0,255,136,0.3);
+  color: var(--green);
+  font-size:0.75rem;
+  padding:0.5rem 1rem;
+  letter-spacing:0.1em;
+  animation: popIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+@keyframes popIn {
+  from { transform:scale(0.5); opacity:0; }
+  to { transform:scale(1); opacity:1; }
+}
+
+.player-count {
+  font-family:'Bebas Neue',cursive;
+  font-size:5rem;
+  color:var(--green);
+  line-height:1;
+}
+
+.btn-launch {
+  margin-top:auto;
+  background: var(--green);
+  color: var(--bg);
+  border:none;
+  font-family:'Bebas Neue',cursive;
+  font-size:2rem;
+  padding:1rem 3rem;
+  cursor:pointer;
+  letter-spacing:0.1em;
+  align-self:flex-start;
+  transition: all 0.2s;
+}
+.btn-launch:hover { transform:translateY(-3px); box-shadow: 0 10px 30px rgba(0,255,136,0.3); }
+
+/* ===== QUESTION SCREEN ===== */
+#question-screen {
+  padding:2rem 3rem;
+}
+
+.q-header {
+  display:flex;
+  align-items:center;
+  gap:2rem;
+  margin-bottom:2rem;
+}
+
+.q-number {
+  font-family:'Bebas Neue',cursive;
+  font-size:1rem;
+  letter-spacing:0.2em;
+  color:var(--dim);
+}
+
+.q-progress {
+  flex:1;
+  height:3px;
+  background: rgba(255,255,255,0.08);
+  position:relative;
+}
+.q-progress-fill {
+  height:100%;
+  background: var(--gold);
+  transition: width 0.5s;
+}
+
+.timer-ring-wrap {
+  position:relative;
+  width:60px;
+  height:60px;
+}
+
+.timer-ring {
+  transform: rotate(-90deg);
+}
+
+.timer-ring-bg { fill:none; stroke:rgba(255,255,255,0.08); stroke-width:4; }
+.timer-ring-fill {
+  fill:none;
+  stroke: var(--gold);
+  stroke-width:4;
+  stroke-linecap:round;
+  stroke-dasharray: 163;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1s linear, stroke 0.3s;
+}
+
+.timer-number {
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:'Bebas Neue',cursive;
+  font-size:1.4rem;
+}
+
+/* LEGENDARY badge */
+.legendary-badge {
+  display:none;
+  background: linear-gradient(135deg, var(--gold), var(--red));
+  color:#000;
+  font-family:'Bebas Neue',cursive;
+  font-size:0.9rem;
+  padding:0.3rem 1rem;
+  letter-spacing:0.2em;
+  animation: legendPulse 0.5s ease infinite alternate;
+}
+
+@keyframes legendPulse {
+  from { box-shadow: 0 0 10px rgba(212,168,67,0.5); }
+  to   { box-shadow: 0 0 25px rgba(255,45,85,0.8); }
+}
+
+.legendary-badge.show { display:block; }
+
+.q-question {
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(1.8rem, 4vw, 3.5rem);
+  line-height:1.1;
+  margin-bottom:2.5rem;
+  max-width:900px;
+}
+
+.q-answers-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:1rem;
+  flex:1;
+}
+
+.q-answer {
+  padding:1.5rem 2rem;
+  border:2px solid rgba(255,255,255,0.1);
+  font-family:'Bebas Neue',cursive;
+  font-size:1.4rem;
+  letter-spacing:0.05em;
+  display:flex;
+  align-items:center;
+  gap:1rem;
+  transition: all 0.3s;
+}
+
+.q-answer .ans-letter {
+  font-size:1rem;
+  opacity:0.5;
+}
+
+.q-answer.correct {
+  background: rgba(0,255,136,0.15);
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.q-answer.wrong {
+  background: rgba(255,45,85,0.1);
+  border-color: rgba(255,45,85,0.3);
+  opacity:0.5;
+}
+
+/* LIVE responses bar */
+.live-responses {
+  margin-top:1.5rem;
+  display:flex;
+  align-items:center;
+  gap:1rem;
+  font-size:0.65rem;
+  letter-spacing:0.2em;
+  text-transform:uppercase;
+  color:var(--dim);
+}
+
+.live-dot {
+  width:6px; height:6px;
+  border-radius:50%;
+  background:var(--green);
+  animation: blink 1s ease infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+.responses-count {
+  font-family:'Bebas Neue',cursive;
+  font-size:1.2rem;
+  color:var(--white);
+}
+
+/* ===== RESULTS SCREEN ===== */
+#results-screen {
+  padding:3rem;
+  background: radial-gradient(ellipse at 50% 100%, rgba(212,168,67,0.1) 0%, transparent 60%);
+}
+
+.results-title {
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(2rem,6vw,5rem);
+  line-height:1;
+  margin-bottom:2rem;
+}
+
+.podium {
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  gap:1rem;
+  margin:2rem 0;
+  height:200px;
+}
+
+.podium-place {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:0.5rem;
+}
+
+.podium-name {
+  font-size:0.7rem;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  text-align:center;
+  max-width:100px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.podium-score {
+  font-family:'Bebas Neue',cursive;
+  font-size:1.2rem;
+}
+
+.podium-bar {
+  width:80px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:'Bebas Neue',cursive;
+  font-size:2rem;
+}
+
+.podium-bar.p1 { height:160px; background: linear-gradient(to top, var(--gold), #f0d070); color:#000; }
+.podium-bar.p2 { height:110px; background: rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.2); }
+.podium-bar.p3 { height:75px; background: rgba(212,168,67,0.2); border:1px solid rgba(212,168,67,0.3); }
+
+.full-ranking {
+  flex:1;
+  overflow-y:auto;
+}
+
+.rank-row {
+  display:flex;
+  align-items:center;
+  gap:1rem;
+  padding:0.75rem 0;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+  font-size:0.8rem;
+}
+
+.rank-pos {
+  font-family:'Bebas Neue',cursive;
+  font-size:1.5rem;
+  color:var(--dim);
+  width:2rem;
+  text-align:right;
+}
+
+.rank-name { flex:1; }
+
+.rank-score {
+  font-family:'Bebas Neue',cursive;
+  font-size:1.2rem;
+  color:var(--gold);
+}
+
+.rank-bar-wrap {
+  width:120px;
+  height:4px;
+  background:rgba(255,255,255,0.05);
+}
+.rank-bar-fill {
+  height:100%;
+  background: var(--gold);
+  transition: width 1s cubic-bezier(0.16,1,0.3,1);
+}
+
+/* ===== BETWEEN Q ===== */
+#between-screen {
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+}
+
+.between-reveal {
+  font-family:'Bebas Neue',cursive;
+  font-size:1rem;
+  letter-spacing:0.4em;
+  color:var(--dim);
+  margin-bottom:1rem;
+}
+
+.between-answer {
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(2rem,6vw,5rem);
+  color:var(--green);
+  margin-bottom:2rem;
+  animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.between-stats {
+  display:flex;
+  gap:3rem;
+  justify-content:center;
+  margin-bottom:2rem;
+}
+
+.bstat {
+  text-align:center;
+}
+.bstat-num {
+  font-family:'Bebas Neue',cursive;
+  font-size:3rem;
+  display:block;
+}
+.bstat-label {
+  font-size:0.6rem;
+  letter-spacing:0.3em;
+  text-transform:uppercase;
+  color:var(--dim);
+}
+
+.btn-next {
+  background:transparent;
+  border:1px solid rgba(255,255,255,0.2);
+  color:var(--white);
+  font-family:'Bebas Neue',cursive;
+  font-size:1.5rem;
+  padding:0.8rem 2.5rem;
+  cursor:pointer;
+  letter-spacing:0.1em;
+  transition: all 0.2s;
+}
+.btn-next:hover { border-color:var(--white); }
+
+/* FLASH EFFECT */
+.flash {
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  opacity:0;
+  z-index:9000;
+  transition: opacity 0.05s;
+}
+.flash.on { opacity:1; }
+
+/* LEGENDARY OVERLAY */
+.legendary-overlay {
+  position:fixed;
+  inset:0;
+  background: rgba(0,0,0,0.85);
+  z-index:500;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  text-align:center;
+}
+.legendary-overlay.show { display:flex; animation: fadeIn 0.3s; }
+
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+.leg-title {
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(3rem,10vw,8rem);
+  background: linear-gradient(135deg, var(--gold), var(--red), var(--gold));
+  background-size:200%;
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  animation: shimmer 2s linear infinite;
+}
+
+@keyframes shimmer { from{background-position:0%} to{background-position:200%} }
+
+.leg-sub {
+  font-size:0.8rem;
+  letter-spacing:0.4em;
+  text-transform:uppercase;
+  color:var(--dim);
+  margin-top:1rem;
+}
+
+/* STARS particle */
+.stars { position:fixed; inset:0; pointer-events:none; overflow:hidden; }
+.star {
+  position:absolute;
+  width:3px; height:3px;
+  border-radius:50%;
+  background:var(--gold);
+  animation: fall linear forwards;
+}
+@keyframes fall {
+  from { transform:translateY(-10px) rotate(0deg); opacity:1; }
+  to { transform:translateY(100vh) rotate(720deg); opacity:0; }
+}
+</style>
+</head>
+<body>
+
+<div class="flash" id="flash"></div>
+<div class="stars" id="stars"></div>
+
+<!-- LEGENDARY OVERLAY -->
+<div class="legendary-overlay" id="legendary-overlay">
+  <div class="leg-title">LEGENDARY<br>ROUND</div>
+  <div class="leg-sub">Double points ✦ Last two questions ✦ Everything to play for</div>
+</div>
+
+<!-- SETUP SCREEN -->
+<div class="screen active" id="setup-screen">
+  <div class="setup-logo">TRAP<br>QUIZ</div>
+  <div class="setup-sub">A$AP Rocky · Chief Keef · Playboi Carti</div>
+
+  <div class="config-box">
+    <div class="config-label">Game Room ID — short code players will type</div>
+    <input class="config-input" id="room-id" type="text" placeholder="e.g. TRAP1" maxlength="8" style="text-transform:uppercase; font-size:1.5rem; letter-spacing:0.3em; text-align:center;">
+    <button class="btn-start" id="btn-init" onclick="initGame()">LAUNCH GAME</button>
+  </div>
+</div>
+
+<!-- LOBBY SCREEN -->
+<div class="screen" id="lobby-screen">
+  <div class="lobby-header">
+    <div>
+      <div class="lobby-title">Waiting for<br>Players</div>
+      <div style="margin-top:1rem; font-size:0.65rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--dim)">
+        Players join at:
+      </div>
+      <div id="lobby-url" style="font-size:0.8rem; color:var(--gold); margin-top:0.3rem; word-break:break-all; max-width:500px;"></div>
+    </div>
+    <div class="lobby-code-box">
+      <div class="lobby-code-label">Room Code</div>
+      <div class="lobby-code" id="lobby-code-display">----</div>
+      <div class="lobby-code-label" style="margin-top:0.5rem">Players connected</div>
+      <div class="player-count" id="player-count">0</div>
+    </div>
+  </div>
+
+  <div class="players-section-title">Connected Players</div>
+  <div class="players-grid" id="players-grid"></div>
+
+  <button class="btn-launch" id="btn-launch" onclick="startGame()">START GAME →</button>
+</div>
+
+<!-- QUESTION SCREEN -->
+<div class="screen" id="question-screen">
+  <div class="q-header">
+    <div class="q-number" id="q-number">Q1 / 10</div>
+    <div class="q-progress">
+      <div class="q-progress-fill" id="q-progress-fill" style="width:10%"></div>
+    </div>
+    <div class="legendary-badge" id="legendary-badge">⚡ LEGENDARY ×2</div>
+    <div class="timer-ring-wrap">
+      <svg class="timer-ring" width="60" height="60" viewBox="0 0 60 60">
+        <circle class="timer-ring-bg" cx="30" cy="30" r="26"/>
+        <circle class="timer-ring-fill" id="timer-ring-fill" cx="30" cy="30" r="26"/>
+      </svg>
+      <div class="timer-number" id="timer-number">10</div>
+    </div>
+  </div>
+
+  <div class="q-question" id="q-question">Question goes here</div>
+
+  <div class="q-answers-grid" id="q-answers-grid"></div>
+
+  <div class="live-responses">
+    <div class="live-dot"></div>
+    <span id="live-resp-count" class="responses-count">0</span>
+    <span>responses received</span>
+  </div>
+</div>
+
+<!-- BETWEEN SCREEN -->
+<div class="screen" id="between-screen">
+  <div class="between-reveal">Correct Answer</div>
+  <div class="between-answer" id="between-answer">—</div>
+  <div class="between-stats">
+    <div class="bstat">
+      <span class="bstat-num" id="bstat-correct" style="color:var(--green)">0</span>
+      <span class="bstat-label">Got it right</span>
+    </div>
+    <div class="bstat">
+      <span class="bstat-num" id="bstat-wrong" style="color:var(--red)">0</span>
+      <span class="bstat-label">Got it wrong</span>
+    </div>
+    <div class="bstat">
+      <span class="bstat-num" id="bstat-pct" style="color:var(--gold)">0%</span>
+      <span class="bstat-label">Accuracy</span>
+    </div>
+  </div>
+  <div style="font-size:0.65rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--dim); margin-bottom:2rem;">Current Leader</div>
+  <div id="between-leader" style="font-family:'Bebas Neue',cursive; font-size:2rem; color:var(--gold); margin-bottom:2rem;">—</div>
+  <button class="btn-next" onclick="nextQuestion()">NEXT QUESTION →</button>
+</div>
+
+<!-- RESULTS SCREEN -->
+<div class="screen" id="results-screen">
+  <div class="results-title">Final<br>Results</div>
+  <div class="podium" id="podium"></div>
+  <div class="full-ranking" id="full-ranking"></div>
+</div>
+
+<script>
+// ==================== QUESTIONS ====================
+const questions = [
+  {
+    q: "What year did A$AP Rocky release his free internet mixtape 'LiveLoveA$AP'?",
+    options: ["2009", "2010", "2011", "2012"],
+    correct: 2,
+    fact: "2011 — dropped free on the internet, spread through Tumblr and blogs. No label, no budget."
+  },
+  {
+    q: "Chief Keef uploaded 'I Don't Like' while under what restriction?",
+    options: ["Probation curfew", "House arrest", "School suspension", "Juvie release"],
+    correct: 1,
+    fact: "House arrest. 16 years old. From his mom's house. Kanye cosigned it within months."
+  },
+  {
+    q: "Which luxury fashion house did A$AP Rocky collaborate with as a creative director?",
+    options: ["Gucci", "Prada", "Dior", "Balenciaga"],
+    correct: 2,
+    fact: "Dior. Rocky opened a lane that barely existed for rappers: real high-fashion creative involvement."
+  },
+  {
+    q: "What social media platform was KEY to Chief Keef going viral in 2012?",
+    options: ["Twitter", "Instagram", "SoundCloud", "Facebook + WorldStar"],
+    correct: 3,
+    fact: "Facebook and WorldStarHipHop. Before Spotify, before SoundCloud — pure viral energy through shares and comments."
+  },
+  {
+    q: "Playboi Carti grew up in the orbit of which rap collective?",
+    options: ["YSL", "A$AP Mob", "Odd Future", "Waka Squad"],
+    correct: 1,
+    fact: "A$AP Mob — specifically close to Rocky. That's where he absorbed the fashion-as-identity philosophy."
+  },
+  {
+    q: "Which Spanish rapper brought drill/trap to Spain citing Chief Keef as a key influence?",
+    options: ["Bad Bunny", "C. Tangana", "Kidd Keo", "Yung Beef"],
+    correct: 2,
+    fact: "Kidd Keo from Alicante directly translated the drill/trap aesthetic to Spain. Pionero."
+  },
+  {
+    q: "The era of music (2015-2017) where Carti, Uzi and Lil Peep thrived with hazy, emotional beats is known as?",
+    options: ["Mumble Rap", "Cloud Rap", "Emo Rap", "SoundCloud Rap"],
+    correct: 1,
+    fact: "Cloud Rap — ethereal production, fashion-forward aesthetics, emotions over complex bars. Rocky helped pioneer it."
+  },
+  {
+    q: "Carti's unique vocal style on WLR (2020) — using a high pitched 'baby voice' — is an example of what?",
+    options: ["Laziness", "Auto-tune abuse", "Voice as a percussion instrument", "Industry plant behavior"],
+    correct: 2,
+    fact: "It's deliberate. Carti uses his voice like a synth pad — for texture and atmosphere, not lyrics. That's the whole point."
+  },
+  // LEGENDARY Q9
+  {
+    q: "⚡ LEGENDARY: Before Keef, what was the name of the drill music sound that HE is credited with inventing and codifying?",
+    options: ["Chicago Soul", "Chiraq Drill", "Southside Trap", "G-Funk Midwest"],
+    correct: 1,
+    fact: "Chiraq Drill — dark minor melodies, 808 hi-hats, minimal flows. A genre born from the streets of Chicago's South Side.",
+    legendary: true
+  },
+  // LEGENDARY Q10
+  {
+    q: "⚡ LEGENDARY: What is the REAL connection between LiveLoveA$AP (Rocky's 2011 mixtape) and Playboi Carti?",
+    options: [
+      "Carti produced two tracks on it",
+      "Carti was featured and part of A$AP's circle from early on",
+      "Rocky sampled Carti's SoundCloud",
+      "They met at a Kanye show in 2013"
+    ],
+    correct: 1,
+    fact: "Carti was part of the A$AP orbit from early on — he absorbed Rocky's fashion philosophy and Keef's energy, then synthesized them into something entirely his own.",
+    legendary: true
+  }
+];
+
+// ==================== STATE ====================
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAK2UNfOHUyl7YrYE0hI9slRZdlnpPQ96s",
+  authDomain: "trap-quiz-67.firebaseapp.com",
+  projectId: "trap-quiz-67",
+  storageBucket: "trap-quiz-67.firebasestorage.app",
+  messagingSenderId: "1039849877202",
+  appId: "1:1039849877202:web:19d12db33ae928ab3a870b",
+  databaseURL: "https://trap-quiz-67-default-rtdb.firebaseio.com"
+};
+
+let db, roomId, gameRef;
+let currentQ = -1;
+let timerInterval = null;
+let timeLeft = 10;
+let players = {};
+let responsesThisQ = {};
+
+// ==================== INIT ====================
+function initGame() {
+  roomId = document.getElementById('room-id').value.trim().toUpperCase();
+  if (!roomId) { alert('Enter a Room ID!'); return; }
+
+  document.getElementById('btn-init').disabled = true;
+  document.getElementById('btn-init').textContent = 'Connecting...';
+
+  const app = firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.database(app);
+  gameRef = db.ref('rooms/' + roomId);
+
+  gameRef.set({
+    status: 'lobby',
+    currentQ: -1,
+    players: {},
+    scores: {}
+  }).then(() => {
+    showScreen('lobby-screen');
+    setupLobbyListeners();
+    document.getElementById('lobby-url').textContent = 'Open player.html and type room code: ' + roomId;
+    document.getElementById('lobby-code-display').textContent = roomId;
+    playMusic(MUSIC.lobby, 0.35); // 🎵 Lobby music starts
+  }).catch(e => {
+    alert('Firebase error: ' + e.message + '\n\nMake sure Realtime Database rules are set to true/true in Firebase console.');
+    document.getElementById('btn-init').disabled = false;
+    document.getElementById('btn-init').textContent = 'LAUNCH GAME';
+  });
+}
+
+function setupLobbyListeners() {
+  gameRef.child('players').on('value', snap => {
+    players = snap.val() || {};
+    const grid = document.getElementById('players-grid');
+    const count = Object.keys(players).length;
+    document.getElementById('player-count').textContent = count;
+
+    grid.innerHTML = Object.values(players).map(p =>
+      `<div class="player-chip">${p.name}</div>`
+    ).join('');
+  });
+}
+
+// ==================== GAME FLOW ====================
+function startGame() {
+  currentQ = -1;
+  stopMusic(); // 🔇 Stop lobby music
+  gameRef.update({ status: 'playing', scores: {} });
+  nextQuestion();
+}
+
+function nextQuestion() {
+  currentQ++;
+  responsesThisQ = {};
+
+  if (currentQ >= questions.length) {
+    showFinalResults();
+    return;
+  }
+
+  const isLegendary = questions[currentQ].legendary;
+
+  if (isLegendary && currentQ === 8) {
+    showLegendaryOverlay(() => showQuestion());
+  } else {
+    showQuestion();
+  }
+}
+
+function showLegendaryOverlay(cb) {
+  const overlay = document.getElementById('legendary-overlay');
+  overlay.classList.add('show');
+  spawnStars(40);
+  playLegendarySound();
+  setTimeout(() => {
+    overlay.classList.remove('show');
+    cb();
+  }, 3500);
+}
+
+function showQuestion() {
+  const q = questions[currentQ];
+  showScreen('question-screen');
+
+  // Header
+  document.getElementById('q-number').textContent = `Q${currentQ+1} / ${questions.length}`;
+  document.getElementById('q-progress-fill').style.width = `${((currentQ+1)/questions.length)*100}%`;
+
+  const badge = document.getElementById('legendary-badge');
+  badge.classList.toggle('show', !!q.legendary);
+
+  // Question text
+  document.getElementById('q-question').textContent = q.q;
+
+  // Answers
+  const letters = ['A','B','C','D'];
+  document.getElementById('q-answers-grid').innerHTML = q.options.map((opt, i) =>
+    `<div class="q-answer" id="ans-${i}">
+      <span class="ans-letter">${letters[i]}</span>
+      ${opt}
+    </div>`
+  ).join('');
+
+  document.getElementById('live-resp-count').textContent = '0';
+
+  // Tell players
+  gameRef.update({
+    currentQ: currentQ,
+    status: 'question',
+    questionStart: Date.now(),
+    answers: null
+  });
+
+  // Listen for answers
+  listenForAnswers();
+
+  // 🎵 Question music
+  playMusic(MUSIC.question, 0.25);
+
+  // Start timer
+  startTimer(q.legendary ? 15 : 10);
+}
+
+function listenForAnswers() {
+  gameRef.child('answers').off();
+  gameRef.child('answers').on('value', snap => {
+    responsesThisQ = snap.val() || {};
+    document.getElementById('live-resp-count').textContent = Object.keys(responsesThisQ).length;
+  });
+}
+
+function startTimer(seconds) {
+  clearInterval(timerInterval);
+  timeLeft = seconds;
+  const circumference = 163;
+  const ring = document.getElementById('timer-ring-fill');
+  const numEl = document.getElementById('timer-number');
+
+  ring.style.strokeDashoffset = 0;
+  ring.style.stroke = 'var(--gold)';
+  numEl.textContent = timeLeft;
+
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    numEl.textContent = timeLeft;
+    const offset = circumference * (1 - timeLeft/seconds);
+    ring.style.strokeDashoffset = offset;
+
+    if (timeLeft <= 3) {
+      ring.style.stroke = 'var(--red)';
+      playTickSound();
+    }
+
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      revealAnswer();
+    }
+  }, 1000);
+}
+
+function revealAnswer() {
+  clearInterval(timerInterval);
+  stopMusic(); // 🔇 Stop question music
+  gameRef.child('answers').off();
+
+  const q = questions[currentQ];
+  const answers = responsesThisQ;
+
+  // Show correct/wrong on host
+  q.options.forEach((_, i) => {
+    const el = document.getElementById('ans-' + i);
+    if (!el) return;
+    el.classList.add(i === q.correct ? 'correct' : 'wrong');
+  });
+
+  // Calculate scores
+  let correctCount = 0;
+  let wrongCount = 0;
+  const scoreUpdates = {};
+
+  Object.entries(answers).forEach(([pid, ans]) => {
+    if (ans.choice === q.correct) {
+      correctCount++;
+      const pts = q.legendary ? 2000 : 1000;
+      scoreUpdates[pid] = (players[pid]?.score || 0) + pts;
+    } else {
+      wrongCount++;
+    }
+  });
+
+  // Update scores in Firebase
+  Object.entries(scoreUpdates).forEach(([pid, score]) => {
+    gameRef.child('players/' + pid + '/score').set(score);
+    players[pid].score = score;
+  });
+
+  // Notify players of correct answer
+  gameRef.update({ status: 'revealed', correctAnswer: q.correct, scores: getScoresMap() });
+
+  // Flash effect
+  triggerFlash(correctCount > wrongCount ? 'rgba(0,255,136,0.15)' : 'rgba(255,45,85,0.1)');
+
+  // Show between screen
+  setTimeout(() => showBetween(q, correctCount, wrongCount), 800);
+}
+
+function getScoresMap() {
+  const map = {};
+  Object.entries(players).forEach(([pid, p]) => {
+    map[pid] = { name: p.name, score: p.score || 0 };
+  });
+  return map;
+}
+
+function showBetween(q, correct, wrong) {
+  showScreen('between-screen');
+  document.getElementById('between-answer').textContent = q.options[q.correct];
+  document.getElementById('bstat-correct').textContent = correct;
+  document.getElementById('bstat-wrong').textContent = wrong;
+  const total = correct + wrong;
+  document.getElementById('bstat-pct').textContent = total ? Math.round((correct/total)*100) + '%' : '0%';
+
+  // Leader
+  const sorted = Object.values(players).sort((a,b) => (b.score||0) - (a.score||0));
+  document.getElementById('between-leader').textContent = sorted[0] ? `${sorted[0].name} — ${sorted[0].score||0} pts` : '—';
+
+  if (correct > 0) playCorrectSound();
+}
+
+function showFinalResults() {
+  gameRef.update({ status: 'results' });
+  showScreen('results-screen');
+  spawnStars(60);
+
+  const sorted = Object.values(players).sort((a,b) => (b.score||0)-(a.score||0));
+  const maxScore = sorted[0]?.score || 1;
+
+  // Podium top 3
+  const p1 = sorted[0], p2 = sorted[1], p3 = sorted[2];
+  document.getElementById('podium').innerHTML = `
+    ${p2 ? `<div class="podium-place">
+      <div class="podium-name">${p2.name}</div>
+      <div class="podium-score">${p2.score||0}</div>
+      <div class="podium-bar p2">2</div>
+    </div>` : ''}
+    ${p1 ? `<div class="podium-place">
+      <div class="podium-name">${p1.name}</div>
+      <div class="podium-score">${p1.score||0}</div>
+      <div class="podium-bar p1">1</div>
+    </div>` : ''}
+    ${p3 ? `<div class="podium-place">
+      <div class="podium-name">${p3.name}</div>
+      <div class="podium-score">${p3.score||0}</div>
+      <div class="podium-bar p3">3</div>
+    </div>` : ''}
+  `;
+
+  document.getElementById('full-ranking').innerHTML = sorted.map((p, i) => `
+    <div class="rank-row">
+      <div class="rank-pos">${i+1}</div>
+      <div class="rank-name">${p.name}</div>
+      <div class="rank-bar-wrap"><div class="rank-bar-fill" style="width:${((p.score||0)/maxScore)*100}%"></div></div>
+      <div class="rank-score">${p.score||0}</div>
+    </div>
+  `).join('');
+
+  playWinSound();
+}
+
+// ==================== UTILS ====================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function triggerFlash(color) {
+  const f = document.getElementById('flash');
+  f.style.background = color;
+  f.classList.add('on');
+  setTimeout(() => f.classList.remove('on'), 150);
+}
+
+function spawnStars(n) {
+  const container = document.getElementById('stars');
+  container.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    star.style.left = Math.random() * 100 + 'vw';
+    star.style.animationDuration = (1.5 + Math.random() * 2) + 's';
+    star.style.animationDelay = Math.random() * 1 + 's';
+    star.style.background = ['var(--gold)','var(--red)','var(--green)','#fff'][Math.floor(Math.random()*4)];
+    container.appendChild(star);
+    setTimeout(() => star.remove(), 4000);
+  }
+}
+
+// ==================== AUDIO / MUSIC SYSTEM ====================
+// ——————————————————————————————————————————————————————————————
+// CAMBIA ESTOS NOMBRES por los de tus archivos MP3 en el repo
+// ——————————————————————————————————————————————————————————————
+const MUSIC = {
+  lobby:    'lobby.mp3',       // Suena en bucle mientras esperan jugadores
+  question: 'question.mp3',    // Suena en bucle durante cada pregunta
+  final:    'final.mp3',       // Suena en la pantalla de resultados finales
+  correct:  'correct.mp3',     // Adlib al acertar (ej. bang bang de Keef)
+  wrong:    'wrong.mp3',       // Sonido al fallar
+  legendary:'legendary.mp3',   // Sonido del legendary round
+};
+// ——————————————————————————————————————————————————————————————
+
+let currentBgMusic = null;
+
+function stopMusic() {
+  if (currentBgMusic) {
+    currentBgMusic.pause();
+    currentBgMusic.currentTime = 0;
+    currentBgMusic = null;
+  }
+}
+
+function playMusic(file, volume = 0.35) {
+  stopMusic();
+  const audio = new Audio(file);
+  audio.loop = true;
+  audio.volume = volume;
+  audio.play().catch(() => {}); // catch autoplay block silently
+  currentBgMusic = audio;
+}
+
+function playSound(file, volume = 0.8) {
+  const audio = new Audio(file);
+  audio.volume = volume;
+  audio.play().catch(() => {});
+}
+
+function playTickSound() {
+  // Tick generado — no necesita archivo
+  const ac = new (window.AudioContext || window.webkitAudioContext)();
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.connect(g); g.connect(ac.destination);
+  o.frequency.value = 800;
+  g.gain.setValueAtTime(0.08, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.08);
+  o.start(); o.stop(ac.currentTime + 0.08);
+}
+
+function playCorrectSound() { playSound(MUSIC.correct); }
+function playWrongSound()   { playSound(MUSIC.wrong); }
+function playLegendarySound() {
+  stopMusic();
+  playSound(MUSIC.legendary);
+}
+function playWinSound() {
+  stopMusic();
+  playMusic(MUSIC.final, 0.5);
+}
+</script>
+</body>
+</html>
