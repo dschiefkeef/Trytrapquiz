@@ -1142,7 +1142,7 @@ function stopMusic() {
   }
 }
 
-function playMusic(file, volume = 0.35) {
+function playMusic(file, volume = 0.95) {
   stopMusic();
   const audio = new Audio(file);
   audio.loop = true;
@@ -1177,7 +1177,7 @@ function playLegendarySound() {
 }
 function playWinSound() {
   stopMusic();
-  playMusic(MUSIC.final, 0.5);
+  playMusic(MUSIC.final, 0.95);
 }
 </script>
 </body>
