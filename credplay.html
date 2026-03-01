@@ -200,23 +200,23 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
     <div class="av-section-label">Choose your artist</div>
     <div class="av-row" id="av-row">
       <!-- Artist images — replace src with actual paths e.g. assets/rocky.jpg -->
-      <div class="av-opt sel" data-url="assets/rocky.jpg" data-name="Rocky" onclick="selectAv(this)">
-        <img src="assets/rocky.jpg" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="A$AP Rocky">
-        <div style="display:none;width:clamp(52px,15vw,72px);height:clamp(52px,15vw,72px);border-radius:50%;background:#111;border:2px solid rgba(255,255,255,.12);align-items:center;justify-content:center;font-size:1.5rem;">🎤</div>
+      <div class="av-opt sel" data-url="assets/asapprof.jpg" data-name="Rocky" onclick="selectAv(this)">
+        <img src="assets/asapprof.jpg" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="A$AP Rocky">
+        <div style="display:none;width:clamp(52px,15vw,72px);height:clamp(52px,15vw,72px);border-radius:50%;background:#111;border:2px solid rgba(255,255,255,.12);align-items:center;justify-content:center;font-size:1.5rem;"></div>
         <div class="av-name">A$AP Rocky</div>
       </div>
-      <div class="av-opt" data-url="assets/keef.jpg" data-name="Keef" onclick="selectAv(this)">
-        <img src="assets/keef.jpg" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="Chief Keef">
-        <div style="display:none;width:clamp(52px,15vw,72px);height:clamp(52px,15vw,72px);border-radius:50%;background:#111;border:2px solid rgba(255,255,255,.12);align-items:center;justify-content:center;font-size:1.5rem;">🖤</div>
+      <div class="av-opt" data-url="assets/keefprof.jpg" data-name="Keef" onclick="selectAv(this)">
+        <img src="assets/keefprof.jpg" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="Chief Keef">
+        <div style="display:none;width:clamp(52px,15vw,72px);height:clamp(52px,15vw,72px);border-radius:50%;background:#111;border:2px solid rgba(255,255,255,.12);align-items:center;justify-content:center;font-size:1.5rem;"></div>
         <div class="av-name">Chief Keef</div>
       </div>
-      <div class="av-opt" data-url="assets/carti.jpg" data-name="Carti" onclick="selectAv(this)">
-        <img src="assets/carti.jpg" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="Playboi Carti">
-        <div style="display:none;width:clamp(52px,15vw,72px);height:clamp(52px,15vw,72px);border-radius:50%;background:#111;border:2px solid rgba(255,255,255,.12);align-items:center;justify-content:center;font-size:1.5rem;">⚡</div>
+      <div class="av-opt" data-url="assets/cartiprof.jpg" data-name="Carti" onclick="selectAv(this)">
+        <img src="assets/cartiprof.jpg" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="Playboi Carti">
+        <div style="display:none;width:clamp(52px,15vw,72px);height:clamp(52px,15vw,72px);border-radius:50%;background:#111;border:2px solid rgba(255,255,255,.12);align-items:center;justify-content:center;font-size:1.5rem;"></div>
         <div class="av-name">Playboi Carti</div>
       </div>
     </div>
-    <button class="join-btn" onclick="joinGame()">JOIN &amp; UNLOCK AUDIO →</button>
+    <button class="join-btn" onclick="joinGame()">JOIN &amp; →</button>
     <div class="j-err" id="j-err"></div>
   </div>
 </div>
@@ -227,13 +227,6 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
   <div class="wait-name" id="wait-name">—</div>
   <div class="wait-msg">You're in · Waiting for host</div>
   <div class="wait-dots"><span>●</span><span>●</span><span>●</span></div>
-  <div class="emoji-bar">
-    <div class="em-btn" onclick="sendEmoji('🔥')">🔥</div>
-    <div class="em-btn" onclick="sendEmoji('💀')">💀</div>
-    <div class="em-btn" onclick="sendEmoji('🤑')">🤑</div>
-    <div class="em-btn" onclick="sendEmoji('😤')">😤</div>
-    <div class="em-btn" onclick="sendEmoji('⚡')">⚡</div>
-  </div>
 </div>
 
 <!-- ALLIN DECISION -->
