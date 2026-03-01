@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>TRAP QUIZ</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&display=swap');
+
+:root {
+  --bg: #050505;
+  --gold: #d4a843;
+  --green: #00ff88;
+  --red: #ff2d55;
+  --white: #f0ece4;
+  --dim: rgba(240,236,228,0.38);
+}
+
+*,*::before,*::after {
+  margin:0;padding:0;box-sizing:border-box;
+  -webkit-tap-highlight-color:transparent;
+}
+
+html, body {
+  width:100%;height:100%;
+  background:var(--bg);
+  color:var(--white);
+  font-family:'Space Mono',monospace;
+  overflow:hidden;
+  touch-action:manipulation;
+}
+
+/* Safe area */
+body {
+  padding-top:env(safe-area-inset-top);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+
+/* Scanlines */
+body::after {
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.04) 2px,rgba(0,0,0,0.04) 4px);
+  pointer-events:none;z-index:9999;
+}
+
+/* ── SCREENS ── */
+.screen {
+  display:none;position:fixed;inset:0;
+  overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+}
+.screen.active { display:flex;flex-direction:column; }
+
+/* Q-SCREEN is special: no scroll, everything fits */
+#q-screen {
+  overflow:hidden;
+  justify-content:space-between;
+}
+
+/* ── JOIN ── */
+#join-screen {
+  align-items:center;justify-content:center;
+  min-height:100%;padding:2rem 1.5rem;text-align:center;
+  background:radial-gradient(ellipse at 50% 0%,rgba(212,168,67,.12) 0%,transparent 60%);
+}
+.join-logo {
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(3.5rem,18vw,7rem);
+  line-height:.88;
+  background:linear-gradient(135deg,var(--gold),var(--red));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  margin-bottom:.35rem;
+}
+.join-sub {
+  font-size:clamp(.5rem,2vw,.65rem);
+  letter-spacing:.4em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:2.5rem;
+}
+.join-form {
+  width:100%;max-width:360px;
+  display:flex;flex-direction:column;gap:.85rem;
+}
+.join-input {
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.15);
+  color:var(--white);font-family:'Space Mono',monospace;
+  font-size:clamp(.9rem,4vw,1.1rem);
+  padding:1rem 1.2rem;outline:none;
+  width:100%;border-radius:0;-webkit-appearance:none;
+  transition:border-color .2s;
+}
+.join-input:focus{border-color:var(--gold);}
+.join-input::placeholder{color:rgba(255,255,255,.2);}
+
+/* Avatar picker */
+.avatar-row {
+  display:flex;gap:.6rem;justify-content:center;
+  flex-wrap:wrap;
+}
+.avatar-opt {
+  font-size:2.2rem;cursor:pointer;
+  padding:.4rem .5rem;border:2px solid transparent;
+  border-radius:4px;transition:all .2s;
+  background:rgba(255,255,255,.04);
+}
+.avatar-opt.selected {
+  border-color:var(--gold);
+  background:rgba(212,168,67,.1);
+  transform:scale(1.15);
+}
+
+/* Join button — doubles as AudioContext unlock */
+.join-btn {
+  background:var(--gold);color:#000;border:none;
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(1.4rem,6vw,1.9rem);
+  padding:.85rem;cursor:pointer;
+  letter-spacing:.1em;width:100%;transition:all .2s;
+}
+.join-btn:active{transform:scale(.97);}
+.join-error {
+  font-size:.62rem;color:var(--red);
+  letter-spacing:.1em;text-align:center;min-height:1rem;
+}
+
+/* ── LOBBY WAIT ── */
+#lobby-wait {
+  align-items:center;justify-content:center;
+  text-align:center;padding:2rem;min-height:100%;
+  background:radial-gradient(ellipse at 50% 0%,rgba(0,255,136,.06) 0%,transparent 60%);
+}
+.wait-avatar {font-size:3.5rem;margin-bottom:.5rem;}
+.wait-name {
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(2.5rem,12vw,4rem);
+  color:var(--green);margin-bottom:.3rem;
+}
+.wait-msg {
+  font-size:clamp(.52rem,2vw,.68rem);
+  letter-spacing:.3em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:1.5rem;
+}
+.wait-dots span {
+  animation:dot-pulse 1.4s ease infinite;
+  display:inline-block;font-size:1.1rem;color:var(--gold);
+}
+.wait-dots span:nth-child(2){animation-delay:.2s;}
+.wait-dots span:nth-child(3){animation-delay:.4s;}
+@keyframes dot-pulse {
+  0%,80%,100%{opacity:.2;transform:translateY(0)}
+  40%{opacity:1;transform:translateY(-5px)}
+}
+
+/* Emoji reaction button */
+.emoji-bar {
+  display:flex;gap:.6rem;flex-wrap:wrap;
+  justify-content:center;margin-top:2rem;
+}
+.emoji-send-btn {
+  font-size:1.6rem;cursor:pointer;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.1);
+  padding:.4rem .55rem;border-radius:4px;
+  transition:transform .15s;
+}
+.emoji-send-btn:active{transform:scale(.88);}
+
+/* ── ALLIN DECISION ── */
+#allin-screen {
+  align-items:center;justify-content:center;
+  text-align:center;padding:2rem;min-height:100%;
+  background:radial-gradient(ellipse at 50% 100%,rgba(212,168,67,.15) 0%,transparent 60%);
+}
+.allin-title {
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(3rem,14vw,5.5rem);
+  background:linear-gradient(135deg,var(--gold),var(--red));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  line-height:1;margin-bottom:.6rem;
+}
+.allin-sub {
+  font-size:clamp(.58rem,2.2vw,.72rem);
+  letter-spacing:.3em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:.5rem;line-height:1.8;
+}
+.allin-stakes {
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(1rem,4vw,1.3rem);
+  color:var(--gold);margin-bottom:2.5rem;
+}
+.allin-btns {display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;}
+.allin-btn {
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(1.4rem,5vw,1.8rem);
+  padding:1rem 2rem;border:none;cursor:pointer;
+  letter-spacing:.1em;transition:all .2s;min-width:140px;
+}
+.allin-btn.yes {background:var(--gold);color:#000;}
+.allin-btn.no  {background:transparent;border:1px solid rgba(255,255,255,.25);color:var(--white);}
+.allin-btn:active{transform:scale(.96);}
+.allin-decided {
+  font-size:clamp(.65rem,2.5vw,.8rem);
+  letter-spacing:.2em;text-transform:uppercase;
+  color:var(--dim);margin-top:1.5rem;
+}
+
+/* ── QUESTION ── */
+#q-screen {
+  padding:clamp(.8rem,3vw,1.2rem);
+  padding-top:max(env(safe-area-inset-top),clamp(.8rem,3vw,1.2rem));
+  padding-bottom:max(env(safe-area-inset-bottom),clamp(.8rem,3vw,1.2rem));
+  gap:.6rem;
+}
+
+.q-top {
+  display:flex;justify-content:space-between;align-items:center;flex-shrink:0;
+}
+.q-num {
+  font-size:clamp(.52rem,1.8vw,.68rem);
+  letter-spacing:.3em;text-transform:uppercase;color:var(--dim);
+}
+.leg-pill {
+  background:linear-gradient(135deg,var(--gold),var(--red));
+  color:#000;font-family:'Bebas Neue',cursive;
+  font-size:clamp(.6rem,2vw,.78rem);
+  padding:.18rem .75rem;letter-spacing:.15em;display:none;
+}
+.leg-pill.show{display:block;animation:lpulse .5s ease infinite alternate;}
+@keyframes lpulse{from{box-shadow:0 0 6px rgba(212,168,67,.5)}to{box-shadow:0 0 18px rgba(255,45,85,.8)}}
+
+/* Timer bar */
+.timer-wrap{height:4px;background:rgba(255,255,255,.08);flex-shrink:0;position:relative;}
+.timer-fill{height:100%;background:var(--gold);transition:width 1s linear;}
+
+/* Section label */
+.q-section {
+  font-size:clamp(.48rem,1.6vw,.6rem);
+  letter-spacing:.35em;text-transform:uppercase;color:var(--dim);flex-shrink:0;
+}
+
+/* Question text */
+.q-text {
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(1.2rem,5.5vw,1.9rem);
+  line-height:1.2;flex:1;
+  display:flex;align-items:center;
+  overflow:hidden;padding:.1rem 0;min-height:0;
+}
+
+/* Thinking placeholder */
+.thinking-msg {
+  flex-shrink:0;padding:.8rem;
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.07);
+  text-align:center;
+  font-size:clamp(.6rem,2.2vw,.75rem);
+  letter-spacing:.2em;text-transform:uppercase;color:var(--dim);
+  display:none;
+}
+.thinking-msg.show{display:block;}
+
+/* Answers */
+.answers-list {
+  display:flex;flex-direction:column;
+  gap:clamp(.38rem,1.4vw,.65rem);flex-shrink:0;
+}
+.ans-btn {
+  padding:clamp(.65rem,2.4vw,1rem) clamp(.85rem,3vw,1.3rem);
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.12);
+  color:var(--white);font-family:'Space Mono',monospace;
+  font-size:clamp(.68rem,2.6vw,.85rem);
+  text-align:left;cursor:pointer;
+  transition:all .15s;display:flex;align-items:center;
+  gap:.7rem;-webkit-appearance:none;border-radius:0;
+  width:100%;line-height:1.4;
+}
+.ans-btn:active:not(:disabled){transform:scale(.98);background:rgba(255,255,255,.09);}
+.ans-letter {
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(.95rem,3.5vw,1.2rem);
+  opacity:.4;flex-shrink:0;width:1.1rem;text-align:center;
+}
+.ans-btn.selected {background:rgba(212,168,67,.12);border-color:var(--gold);color:var(--gold);}
+.ans-btn.selected .ans-letter{opacity:1;color:var(--gold);}
+.ans-btn.correct {background:rgba(0,255,136,.14);border-color:var(--green);color:var(--green);}
+.ans-btn.correct .ans-letter{opacity:1;color:var(--green);}
+.ans-btn.wrong {background:rgba(255,45,85,.06);border-color:rgba(255,45,85,.2);opacity:.4;}
+.ans-btn:disabled{cursor:not-allowed;}
+.ans-btn.locked-allin::after{content:' 🎰';opacity:.6;}
+
+/* ── WHO'S MISSING (player side) ── */
+.missing-section {flex-shrink:0;}
+.missing-title {
+  font-size:clamp(.45rem,1.5vw,.58rem);
+  letter-spacing:.3em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:.35rem;
+}
+.missing-chips {display:flex;flex-wrap:wrap;gap:.3rem;}
+.m-chip {
+  font-size:.58rem;letter-spacing:.06em;
+  padding:.15rem .5rem;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.1);color:var(--dim);
+  transition:all .3s;
+}
+.m-chip.answered {
+  background:rgba(0,255,136,.06);
+  border-color:rgba(0,255,136,.2);
+  color:rgba(0,255,136,.5);text-decoration:line-through;opacity:.5;
+}
+
+/* ── WAIT REVEAL ── */
+#wait-reveal {
+  align-items:center;justify-content:center;
+  text-align:center;padding:2rem;min-height:100%;
+}
+.wr-icon {font-size:clamp(3rem,12vw,4.5rem);margin-bottom:.8rem;animation:spin 2s linear infinite;}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.wr-msg {font-family:'Bebas Neue',cursive;font-size:clamp(1.5rem,7vw,2.2rem);margin-bottom:.35rem;}
+.wr-sub {font-size:clamp(.52rem,2vw,.68rem);letter-spacing:.3em;text-transform:uppercase;color:var(--dim);}
+
+/* Emoji reactions while waiting */
+.wr-emoji-bar {display:flex;gap:.55rem;flex-wrap:wrap;justify-content:center;margin-top:1.5rem;}
+.wr-emoji-btn {
+  font-size:1.5rem;cursor:pointer;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.1);
+  padding:.35rem .5rem;border-radius:4px;
+  transition:transform .15s;
+}
+.wr-emoji-btn:active{transform:scale(.85);}
+
+/* ── RESULT ── */
+#result-screen {
+  align-items:center;justify-content:center;
+  text-align:center;padding:clamp(1.5rem,5vw,2.5rem);
+  min-height:100%;overflow-y:auto;
+}
+.result-icon {font-size:clamp(3.5rem,14vw,5.5rem);margin-bottom:.5rem;animation:popIn .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes popIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+.result-label {font-size:clamp(.52rem,2vw,.68rem);letter-spacing:.4em;text-transform:uppercase;margin-bottom:.4rem;}
+.result-answer {
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(1.5rem,6vw,2.2rem);
+  margin-bottom:1rem;padding:0 1rem;
+}
+.result-fact {
+  font-size:clamp(.62rem,2.2vw,.75rem);line-height:1.85;
+  color:var(--dim);border-left:2px solid rgba(255,255,255,.12);
+  padding:.75rem 1rem;text-align:left;
+  margin:0 auto;max-width:380px;width:100%;
+}
+.result-pts {
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(2.5rem,10vw,3.5rem);margin-top:1.2rem;
+}
+.result-total {
+  font-size:clamp(.52rem,2vw,.65rem);letter-spacing:.3em;text-transform:uppercase;color:var(--dim);
+}
+.result-streak {font-size:clamp(.65rem,2.2vw,.8rem);color:var(--gold);margin-top:.4rem;letter-spacing:.15em;}
+
+/* ── FINAL ── */
+#final-screen {
+  padding:clamp(1.5rem,5vw,2.5rem);
+  align-items:center;justify-content:center;
+  text-align:center;min-height:100%;overflow-y:auto;
+  background:radial-gradient(ellipse at 50% 100%,rgba(212,168,67,.1) 0%,transparent 60%);
+}
+.final-title {font-family:'Bebas Neue',cursive;font-size:clamp(2.5rem,10vw,4rem);line-height:1;margin-bottom:.3rem;}
+.final-avatar {font-size:3rem;margin-bottom:.3rem;}
+.final-rank {
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(4.5rem,18vw,7rem);line-height:1;color:var(--gold);
+  animation:popIn .5s cubic-bezier(.34,1.56,.64,1);
+}
+.final-name {font-size:clamp(.52rem,2vw,.68rem);letter-spacing:.3em;text-transform:uppercase;color:var(--dim);margin-bottom:.5rem;}
+.final-score {font-family:'Bebas Neue',cursive;font-size:clamp(1.8rem,7vw,2.8rem);color:var(--green);}
+.final-stats {
+  display:flex;gap:1.5rem;flex-wrap:wrap;justify-content:center;
+  margin:1.2rem 0;
+}
+.fstat {text-align:center;}
+.fstat-num {font-family:'Bebas Neue',cursive;font-size:clamp(1.4rem,5vw,2rem);display:block;}
+.fstat-label {font-size:.52rem;letter-spacing:.3em;text-transform:uppercase;color:var(--dim);}
+.final-ranking-list {margin-top:1.2rem;width:100%;max-width:360px;text-align:left;}
+.final-row {
+  display:flex;align-items:center;gap:.85rem;
+  padding:.5rem 0;border-bottom:1px solid rgba(255,255,255,.05);
+  font-size:clamp(.68rem,2.5vw,.82rem);
+}
+.final-row.me{color:var(--gold);}
+.final-row-pos{font-family:'Bebas Neue',cursive;font-size:1.2rem;width:1.5rem;}
+.final-row-avatar{font-size:1.1rem;width:1.3rem;text-align:center;flex-shrink:0;}
+.final-row-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.final-row-streak{font-size:.9rem;flex-shrink:0;}
+
+/* ── KICKED ── */
+#kicked-screen {
+  align-items:center;justify-content:center;
+  text-align:center;padding:2rem;min-height:100%;
+  background:radial-gradient(ellipse at 50% 100%,rgba(255,45,85,.08) 0%,transparent 60%);
+}
+.kicked-icon{font-size:4rem;margin-bottom:1rem;}
+.kicked-title{font-family:'Bebas Neue',cursive;font-size:clamp(2.5rem,10vw,4rem);color:var(--red);margin-bottom:.5rem;}
+.kicked-msg{font-size:clamp(.6rem,2.5vw,.75rem);letter-spacing:.15em;color:var(--dim);line-height:1.8;}
+
+/* ── FLASH ── */
+.flash{position:fixed;inset:0;pointer-events:none;opacity:0;z-index:9000;transition:opacity .05s;}
+.flash.on{opacity:1;}
+
+/* ── LEGENDARY SPLASH ── */
+.legend-splash{
+  position:fixed;inset:0;background:rgba(0,0,0,.94);
+  z-index:800;display:none;
+  align-items:center;justify-content:center;flex-direction:column;
+  text-align:center;padding:2rem;
+}
+.legend-splash.show{display:flex;animation:fadeIn .3s;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.leg-big{
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(3rem,14vw,5rem);
+  background:linear-gradient(135deg,var(--gold),var(--red));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  line-height:1.05;
+}
+.leg-sub{font-size:clamp(.58rem,2.2vw,.75rem);letter-spacing:.45em;text-transform:uppercase;color:var(--dim);margin-top:.5rem;}
+
+/* ── RESULT BADGE POP ── */
+.result-badge-overlay{
+  position:fixed;inset:0;pointer-events:none;z-index:700;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .1s;
+}
+.result-badge-overlay.show{opacity:1;}
+.result-badge-overlay.hide{opacity:0;transition:opacity .4s;}
+.result-badge{
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(3.5rem,18vw,7rem);
+  letter-spacing:.05em;padding:.8rem 1.8rem;
+  animation:badgePop .35s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes badgePop{from{transform:scale(.2) rotate(-8deg);opacity:0}to{transform:scale(1) rotate(0);opacity:1}}
+.result-badge.good{color:var(--green);text-shadow:0 0 40px rgba(0,255,136,.6);border:3px solid var(--green);background:rgba(0,255,136,.06);}
+.result-badge.bad{color:var(--red);text-shadow:0 0 40px rgba(255,45,85,.6);border:3px solid var(--red);background:rgba(255,45,85,.06);}
+
+/* Winner flash overlay */
+.winner-flash{
+  position:fixed;inset:0;pointer-events:none;z-index:500;
+  opacity:0;transition:opacity .3s;
+}
+.winner-flash.show{opacity:1;animation:winnerPulse 1.5s ease infinite alternate;}
+@keyframes winnerPulse{from{background:rgba(212,168,67,.12)}to{background:rgba(212,168,67,.28)}}
+</style>
+</head>
+<body>
+
+<div class="flash" id="flash"></div>
+<div class="winner-flash" id="winner-flash"></div>
+<div class="result-badge-overlay" id="badge-overlay">
+  <div class="result-badge" id="badge-text"></div>
+</div>
+
+<div class="legend-splash" id="legend-splash">
+  <div class="leg-big">⚡ ALL IN<br>ROUND ⚡</div>
+  <div class="leg-sub">Double points · Your call</div>
+</div>
+
+<!-- JOIN -->
+<div class="screen active" id="join-screen">
+  <div class="join-logo">TRAP<br>QUIZ</div>
+  <div class="join-sub">A$AP · Keef · Carti</div>
+  <div class="join-form">
+    <input class="join-input" id="inp-room" type="text" placeholder="Room Code (e.g. TRAP1)" maxlength="6" autocomplete="off" spellcheck="false" autocapitalize="characters">
+    <input class="join-input" id="inp-name" type="text" placeholder="Your name" maxlength="16" autocomplete="off">
+    <div style="font-size:.58rem;letter-spacing:.3em;text-transform:uppercase;color:var(--dim);margin-bottom:.3rem;">Pick your artist</div>
+    <div class="avatar-row" id="avatar-row">
+      <div class="avatar-opt" data-avatar="🎤" onclick="selectAvatar(this)">🎤</div>
+      <div class="avatar-opt" data-avatar="🔱" onclick="selectAvatar(this)">🔱</div>
+      <div class="avatar-opt" data-avatar="🖤" onclick="selectAvatar(this)">🖤</div>
+      <div class="avatar-opt" data-avatar="⚡" onclick="selectAvatar(this)">⚡</div>
+      <div class="avatar-opt" data-avatar="🌹" onclick="selectAvatar(this)">🌹</div>
+      <div class="avatar-opt" data-avatar="🐍" onclick="selectAvatar(this)">🐍</div>
+    </div>
+    <button class="join-btn" onclick="joinGame()">JOIN & UNLOCK AUDIO →</button>
+    <div class="join-error" id="join-error"></div>
+  </div>
+</div>
+
+<!-- LOBBY WAIT -->
+<div class="screen" id="lobby-wait">
+  <div class="wait-avatar" id="wait-avatar">🎤</div>
+  <div class="wait-name" id="wait-name">—</div>
+  <div class="wait-msg">You're in · Waiting for host</div>
+  <div class="wait-dots"><span>●</span><span>●</span><span>●</span></div>
+  <div class="emoji-bar">
+    <div class="emoji-send-btn" onclick="sendEmoji('🔥')">🔥</div>
+    <div class="emoji-send-btn" onclick="sendEmoji('💀')">💀</div>
+    <div class="emoji-send-btn" onclick="sendEmoji('🤑')">🤑</div>
+    <div class="emoji-send-btn" onclick="sendEmoji('😤')">😤</div>
+    <div class="emoji-send-btn" onclick="sendEmoji('⚡')">⚡</div>
+  </div>
+</div>
+
+<!-- ALL-IN DECISION -->
+<div class="screen" id="allin-screen">
+  <div class="allin-title">⚡ ALL IN ⚡</div>
+  <div class="allin-sub">This is a double-or-nothing round.<br>Nobody knows what you decide.</div>
+  <div class="allin-stakes" id="allin-stakes">Right → ×2 points · Wrong → lose base points</div>
+  <div class="allin-btns">
+    <button class="allin-btn yes" onclick="decideAllin(true)">I'M IN 🎰</button>
+    <button class="allin-btn no" onclick="decideAllin(false)">PLAY SAFE</button>
+  </div>
+  <div class="allin-decided" id="allin-decided"></div>
+</div>
+
+<!-- QUESTION -->
+<div class="screen" id="q-screen">
+  <div class="q-top">
+    <div class="q-num" id="q-num">Q1 / 10</div>
+    <div class="leg-pill" id="leg-pill">⚡ ALL IN</div>
+  </div>
+  <div class="timer-wrap"><div class="timer-fill" id="timer-fill"></div></div>
+  <div class="q-section" id="q-section">—</div>
+  <div class="q-text" id="q-text">Loading...</div>
+
+  <div class="thinking-msg" id="thinking-msg">Host will reveal options shortly...</div>
+
+  <div class="answers-list" id="answers-list"></div>
+
+  <!-- Who's still missing -->
+  <div class="missing-section" id="missing-section">
+    <div class="missing-title">Waiting for</div>
+    <div class="missing-chips" id="missing-chips"></div>
+  </div>
+</div>
+
+<!-- WAIT REVEAL -->
+<div class="screen" id="wait-reveal">
+  <div class="wr-icon">⏳</div>
+  <div class="wr-msg" id="wr-msg">Locked in!</div>
+  <div class="wr-sub">Waiting for host to reveal...</div>
+  <div class="wr-emoji-bar">
+    <div class="wr-emoji-btn" onclick="sendEmoji('🔥')">🔥</div>
+    <div class="wr-emoji-btn" onclick="sendEmoji('💀')">💀</div>
+    <div class="wr-emoji-btn" onclick="sendEmoji('🤑')">🤑</div>
+    <div class="wr-emoji-btn" onclick="sendEmoji('😤')">😤</div>
+    <div class="wr-emoji-btn" onclick="sendEmoji('⚡')">⚡</div>
+  </div>
+</div>
+
+<!-- RESULT -->
+<div class="screen" id="result-screen">
+  <div class="result-icon" id="result-icon">✅</div>
+  <div class="result-label" id="result-label">Correct</div>
+  <div class="result-answer" id="result-answer">—</div>
+  <div class="result-fact" id="result-fact">—</div>
+  <div class="result-pts" id="result-pts">+0</div>
+  <div class="result-total">Total: <span id="result-total">0</span> pts</div>
+  <div class="result-streak" id="result-streak"></div>
+</div>
+
+<!-- FINAL -->
+<div class="screen" id="final-screen">
+  <div class="final-title">Game Over</div>
+  <div class="final-avatar" id="final-avatar">🎤</div>
+  <div class="final-rank" id="final-rank">#—</div>
+  <div class="final-name" id="final-name">—</div>
+  <div class="final-score" id="final-score">0 pts</div>
+  <div class="final-stats">
+    <div class="fstat"><span class="fstat-num" id="fstat-correct" style="color:var(--green)">0</span><span class="fstat-label">Correct</span></div>
+    <div class="fstat"><span class="fstat-num" id="fstat-streak" style="color:var(--gold)">0</span><span class="fstat-label">Best Streak</span></div>
+    <div class="fstat"><span class="fstat-num" id="fstat-allin" style="color:var(--red)">0</span><span class="fstat-label">All-Ins Won</span></div>
+  </div>
+  <div class="final-ranking-list" id="final-ranking-list"></div>
+</div>
+
+<!-- KICKED -->
+<div class="screen" id="kicked-screen">
+  <div class="kicked-icon">🚫</div>
+  <div class="kicked-title">You've been<br>removed</div>
+  <div class="kicked-msg">The host removed you from this session.<br>Close this tab and rejoin if it was a mistake.</div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+//  QUESTIONS (same as host — local copy for rendering)
+// ══════════════════════════════════════════
+const QUESTIONS = [
+  { section:"ASAP ROCKY", q:"Rocky's mother split the names of her favorite rap duo between her two children. What were those names?", options:["Rocky and Biggie","Rakim and Erika B","Flacko and Ferg","Harlem and Jay"], correct:1, fact:"Rakim and Erika B — one half of Eric B. & Rakim. She named one child Rakim and the other Erika. Rocky chose his own rap name later.", allin:false },
+  { section:"ASAP ROCKY", q:"How was LiveLoveA$AP released in October 2011?", options:["Exclusively on iTunes for $9.99","Through a major label deal with RCA","As a free digital download","On physical CD in New York record stores"], correct:2, fact:"Free digital download. No label, no budget. Spread through Tumblr, music blogs, and early social media. The internet was the label.", allin:false },
+  { section:"ASAP ROCKY", q:"Who was A$AP Rocky's best friend?", options:["P Diddy","A$AP Yams","Travis Scott","Casanova"], correct:1, fact:"A$AP Yams — the co-founder and strategic mind of A$AP Mob. He passed away in 2015. Rocky dedicated his career to him.", allin:false },
+  { section:"CHIEF KEEF", q:"Where was Chief Keef when he recorded the music that made him famous?", options:["In a pro Chicago studio funded by Kanye","In a youth detention center in Illinois","Under house arrest at his grandmother's home","On tour across the South Side of Chicago"], correct:2, fact:"House arrest at his grandmother's home on the South Side. 16 years old. A webcam and basic equipment. That was it.", allin:false },
+  { section:"CHIEF KEEF", q:"What happened after Kanye West heard \"I Don't Like\"?", options:["He signed Keef directly to GOOD Music","He remixed it with Pusha T, Big Sean and Jadakiss","He produced the entire Finally Rich album","He gave Keef a one million dollar advance"], correct:1, fact:"Kanye remixed 'I Don't Like' with Pusha T, Big Sean and Jadakiss. That remix blew Keef up nationally. Kanye called it one of the best songs he'd ever heard.", allin:false },
+  { section:"CHIEF KEEF", q:"How did Chief Keef build his fanbase while he could not leave the house?", options:["He mailed CDs to Chicago high schools","He paid a radio DJ to spin his songs on FM","He uploaded music and videos to YouTube and promoted on Facebook and Twitter","He sent demos to labels by email through his manager"], correct:2, fact:"Pure DIY: YouTube for music, Facebook and Twitter for promotion. While under house arrest. At 15 and 16. The internet was his only street.", allin:false },
+  { section:"PLAYBOI CARTI", q:"What was Playboi Carti's original rap name when he first started uploading music in 2011?", options:["Lil Jordan","Young Carter","Sir Cartier","ASAP Carti"], correct:2, fact:"Sir Cartier — uploading from Atlanta before the A$AP connection. He was 14-15. The fashion obsession was already there in the name.", allin:false },
+  { section:"PLAYBOI CARTI", q:"How did Carti meet A$AP Rocky?", options:["Rocky found him on SoundCloud and reached out","They met at a music festival in Atlanta","He was introduced through A$AP Bari after moving to NYC","Rocky's manager signed him after seeing him perform at an open mic"], correct:2, fact:"A$AP Bari connected them after Carti moved to New York. He became part of the orbit before he ever had a deal.", allin:false },
+  { section:"PLAYBOI CARTI", q:"When did Whole Lotta Red drop?", options:["2019","2020","2021","2022"], correct:1, fact:"December 25, 2020. Christmas Day. After years of delays and one of the most anticipated rap album rollouts in recent memory.", allin:true },
+  { section:"FINAL", q:"How did all three artists — Rocky, Chief Keef and Playboi Carti — first become known?", options:["Their parents worked in the music industry and opened doors","They were elite athletes who transitioned into music","They uploaded their music directly to the internet and built audiences without label support","They graduated from arts programs and were discovered by scouts"], correct:2, fact:"All three bypassed the traditional industry. No label. No budget. Just internet, raw talent, and timing. Rocky via Tumblr. Keef via YouTube from house arrest. Carti via SoundCloud from NYC. The template changed forever.", allin:true }
+];
+
+// ══════════════════════════════════════════
+//  FIREBASE
+// ══════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAK2UNfOHUyl7YrYE0hI9slRZdlnpPQ96s",
+  authDomain: "trap-quiz-67.firebaseapp.com",
+  projectId: "trap-quiz-67",
+  storageBucket: "trap-quiz-67.firebasestorage.app",
+  messagingSenderId: "1039849877202",
+  appId: "1:1039849877202:web:19d12db33ae928ab3a870b",
+  databaseURL: "https://trap-quiz-67-default-rtdb.firebaseio.com"
+};
+
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let db, gameRef, playerId, playerName, playerAvatar = '🎤', roomId;
+let myScore = 0;
+let myCorrect = 0;
+let myBestStreak = 0;
+let myAllinWins = 0;
+let currentQIndex = -1;
+let answered = false;
+let myChoice = null;
+let timerInterval = null;
+let allinDecision = null; // true/false
+let emojiLastSent = 0;
+
+// ── AudioContext (unlocked on JOIN button tap) ──
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+function getAC() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+// ══════════════════════════════════════════
+//  URL AUTO-FILL
+// ══════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const room = params.get('room');
+  if (room) document.getElementById('inp-room').value = room.toUpperCase();
+
+  ['inp-room','inp-name'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => {
+      if (e.key === 'Enter') joinGame();
+    });
+  });
+});
+
+// ══════════════════════════════════════════
+//  AVATAR
+// ══════════════════════════════════════════
+function selectAvatar(el) {
+  document.querySelectorAll('.avatar-opt').forEach(a => a.classList.remove('selected'));
+  el.classList.add('selected');
+  playerAvatar = el.dataset.avatar;
+}
+// default selection
+document.addEventListener('DOMContentLoaded', () => {
+  const first = document.querySelector('.avatar-opt');
+  if (first) first.classList.add('selected');
+});
+
+// ══════════════════════════════════════════
+//  JOIN
+// ══════════════════════════════════════════
+function joinGame() {
+  // Unlock AudioContext HERE — this is the user gesture
+  getAC();
+
+  roomId = document.getElementById('inp-room').value.trim().toUpperCase();
+  playerName = document.getElementById('inp-name').value.trim();
+  const err = document.getElementById('join-error');
+
+  if (!roomId || !playerName) { err.textContent = 'Fill in both fields!'; return; }
+  err.textContent = '';
+
+  try {
+    const app = firebase.initializeApp(FIREBASE_CONFIG, 'player-' + Date.now());
+    db = firebase.database(app);
+  } catch(e) { db = firebase.database(); }
+
+  gameRef = db.ref('rooms/' + roomId);
+  playerId = 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
+
+  gameRef.child('players/' + playerId).set({
+    name: playerName,
+    score: 0,
+    avatar: playerAvatar,
+    streak: 0,
+    joined: Date.now()
+  }).then(() => {
+    document.getElementById('wait-name').textContent = playerName;
+    document.getElementById('wait-avatar').textContent = playerAvatar;
+    document.getElementById('final-avatar').textContent = playerAvatar;
+    showScreen('lobby-wait');
+    listenToGame();
+    listenForKick();
+  }).catch(e => {
+    document.getElementById('join-error').textContent = 'Could not join: ' + e.message;
+  });
+}
+
+// ══════════════════════════════════════════
+//  KICK LISTENER
+// ══════════════════════════════════════════
+function listenForKick() {
+  gameRef.child('kicked/' + playerId).on('value', snap => {
+    if (snap.val()) showScreen('kicked-screen');
+  });
+}
+
+// ══════════════════════════════════════════
+//  EMOJI REACTIONS
+// ══════════════════════════════════════════
+function sendEmoji(emoji) {
+  const now = Date.now();
+  if (now - emojiLastSent < 1500) return; // rate limit: 1.5s per player
+  emojiLastSent = now;
+  gameRef.child('reactions').push({
+    emoji: emoji,
+    pid: playerId,
+    x: Math.random() * 70 + 10,
+    t: now
+  });
+}
+
+// ══════════════════════════════════════════
+//  LISTEN TO GAME
+// ══════════════════════════════════════════
+function listenToGame() {
+  gameRef.on('value', snap => {
+    const data = snap.val();
+    if (!data) return;
+
+    const status = data.status;
+    const paused = data.paused || false;
+
+    if (status === 'lobby') {
+      showScreen('lobby-wait');
+    }
+    else if (status === 'question_thinking') {
+      // Host showed question but not options yet
+      const qIdx = data.currentQ;
+      if (qIdx !== currentQIndex) {
+        currentQIndex = qIdx;
+        answered = false;
+        myChoice = null;
+        allinDecision = null;
+        renderQuestionThinking(data);
+      }
+    }
+    else if (status === 'question') {
+      const qIdx = data.currentQ;
+      // Options are now visible
+      if (!data.optionsVisible) return;
+      if (answered) return; // already answered, stay on wait-reveal
+      // If this is a new question index without prior thinking phase
+      if (qIdx !== currentQIndex) {
+        currentQIndex = qIdx;
+        answered = false;
+        myChoice = null;
+        allinDecision = null;
+      }
+      renderQuestionOptions(data);
+    }
+    else if (status === 'revealed') {
+      clearInterval(timerInterval);
+      if (document.getElementById('q-screen').classList.contains('active') ||
+          document.getElementById('wait-reveal').classList.contains('active') ||
+          document.getElementById('allin-screen').classList.contains('active')) {
+        showReveal(data);
+      }
+    }
+    else if (status === 'results') {
+      if (data.winnerId === playerId) {
+        document.getElementById('winner-flash').classList.add('show');
+      }
+      showFinal(data);
+    }
+
+    // Pause/resume propagation
+    if (status === 'question') {
+      // No pause control on player side, host manages it
+    }
+
+    // Listen for who answered (missing bar)
+    if ((status === 'question' || status === 'question_thinking') && data.answers) {
+      updateMissingChips(data.answers, data);
+    }
+  });
+}
+
+// ══════════════════════════════════════════
+//  QUESTION — THINKING PHASE
+// ══════════════════════════════════════════
+function renderQuestionThinking(data) {
+  const qIdx = data.currentQ;
+  const q = QUESTIONS[qIdx];
+  if (!q) return;
+
+  // If all-in question, show allin decision screen first
+  if (q.allin && allinDecision === null) {
+    showAllinScreen(q);
+    return;
+  }
+
+  showScreen('q-screen');
+  document.getElementById('q-num').textContent = `Q${qIdx+1} / ${QUESTIONS.length}`;
+  document.getElementById('leg-pill').classList.toggle('show', !!q.allin);
+  document.getElementById('q-section').textContent = q.section || '';
+  document.getElementById('q-text').textContent = q.q;
+
+  // Show thinking placeholder, hide answers
+  document.getElementById('thinking-msg').classList.add('show');
+  document.getElementById('answers-list').innerHTML = '';
+  document.getElementById('missing-section').style.display = 'none';
+
+  // No timer yet
+  clearInterval(timerInterval);
+  const bar = document.getElementById('timer-fill');
+  bar.style.transition = 'none';
+  bar.style.width = '100%';
+  bar.style.background = 'var(--gold)';
+}
+
+// ══════════════════════════════════════════
+//  ALLIN DECISION
+// ══════════════════════════════════════════
+function showAllinScreen(q) {
+  showScreen('allin-screen');
+  document.getElementById('allin-decided').textContent = '';
+}
+
+function decideAllin(goIn) {
+  allinDecision = goIn;
+  document.getElementById('allin-decided').textContent = goIn ? '🎰 You\'re all in. Good luck.' : '✅ Playing it safe. Smart.';
+  document.getElementById('allin-screen').querySelectorAll('.allin-btn').forEach(b => b.disabled = true);
+
+  // Store decision temporarily; will be sent with answer
+  // Now move to the question thinking state
+  const qIdx = currentQIndex;
+  const q = QUESTIONS[qIdx];
+  if (!q) return;
+
+  // Transition to question after brief pause
+  setTimeout(() => {
+    showScreen('q-screen');
+    document.getElementById('q-num').textContent = `Q${qIdx+1} / ${QUESTIONS.length}`;
+    document.getElementById('leg-pill').classList.add('show');
+    document.getElementById('q-section').textContent = q.section || '';
+    document.getElementById('q-text').textContent = q.q;
+    document.getElementById('thinking-msg').classList.add('show');
+    document.getElementById('answers-list').innerHTML = '';
+    document.getElementById('missing-section').style.display = 'none';
+  }, 1200);
+}
+
+// ══════════════════════════════════════════
+//  QUESTION — OPTIONS PHASE
+// ══════════════════════════════════════════
+function renderQuestionOptions(data) {
+  const qIdx = data.currentQ;
+  const q = QUESTIONS[qIdx];
+  if (!q) return;
+
+  if (q.allin && allinDecision === null) {
+    // They never got to decide (joined late, etc) — default safe
+    allinDecision = false;
+  }
+
+  if (answered) return;
+
+  showScreen('q-screen');
+  document.getElementById('q-num').textContent = `Q${qIdx+1} / ${QUESTIONS.length}`;
+  document.getElementById('leg-pill').classList.toggle('show', !!q.allin);
+  document.getElementById('q-section').textContent = q.section || '';
+  document.getElementById('q-text').textContent = q.q;
+  document.getElementById('thinking-msg').classList.remove('show');
+
+  const letters = ['A','B','C','D'];
+  document.getElementById('answers-list').innerHTML = q.options.map((opt, i) =>
+    `<button class="ans-btn${q.allin && allinDecision ? ' locked-allin':''}" id="abtn-${i}" onclick="selectAnswer(${i}, ${qIdx})">
+      <span class="ans-letter">${letters[i]}</span>${opt}
+    </button>`
+  ).join('');
+
+  // Show missing section
+  document.getElementById('missing-section').style.display = 'block';
+  updateMissingChips(data.answers || {}, data);
+
+  // Timer — sync with host (15s normal / 40s allin)
+  const seconds = q.allin ? 40 : 15;
+  startTimerBar(seconds, data.questionStart);
+
+  // Legendary splash if first time seeing this question as allin
+  if (q.allin) {
+    const splash = document.getElementById('legend-splash');
+    splash.classList.add('show');
+    playLegendaryTone();
+    setTimeout(() => splash.classList.remove('show'), 2500);
+  }
+}
+
+function updateMissingChips(answers, data) {
+  // We don't have full player list on player side — use what we know
+  const container = document.getElementById('missing-chips');
+  if (!container) return;
+  // Get player list from Firebase scores or just show answered count
+  const answered = Object.keys(answers || {});
+  // Simple: show count
+  // If we have scores, show names
+  const scores = data.scores || {};
+  const allPlayers = Object.values(scores);
+  if (allPlayers.length > 0) {
+    container.innerHTML = allPlayers.map(p => {
+      const pid = Object.keys(scores).find(k => scores[k]?.name === p.name);
+      const has = pid ? !!answers[pid] : false;
+      return `<div class="m-chip ${has?'answered':''}">${p.avatar||'🎤'} ${escHtml(p.name)}</div>`;
+    }).join('');
+  } else {
+    container.innerHTML = `<div class="m-chip">${answered.length} answered</div>`;
+  }
+}
+
+function startTimerBar(seconds, questionStart) {
+  clearInterval(timerInterval);
+  const bar = document.getElementById('timer-fill');
+
+  // Sync with server time if we have questionStart
+  let elapsed = 0;
+  if (questionStart) {
+    elapsed = Math.min(seconds, Math.max(0, (Date.now() - questionStart) / 1000));
+  }
+
+  const remaining = seconds - elapsed;
+  const pct = (remaining / seconds) * 100;
+
+  bar.style.transition = 'none';
+  bar.style.width = pct + '%';
+  bar.style.background = elapsed > seconds * 0.66 ? 'var(--red)' : 'var(--gold)';
+
+  setTimeout(() => {
+    bar.style.transition = `width ${remaining}s linear`;
+    bar.style.width = '0%';
+  }, 60);
+
+  let t = remaining;
+  timerInterval = setInterval(() => {
+    t--;
+    if (t <= 5) bar.style.background = 'var(--red)';
+    if (t <= 0) clearInterval(timerInterval);
+  }, 1000);
+}
+
+// ══════════════════════════════════════════
+//  SELECT ANSWER
+// ══════════════════════════════════════════
+function selectAnswer(choice, qIdx) {
+  if (answered) return;
+  answered = true;
+  myChoice = choice;
+
+  document.querySelectorAll('.ans-btn').forEach((btn, i) => {
+    btn.disabled = true;
+    if (i === choice) btn.classList.add('selected');
+  });
+
+  gameRef.child('answers/' + playerId).set({
+    choice: choice,
+    time: Date.now(),
+    name: playerName,
+    allin: allinDecision || false
+  });
+
+  playSelectSound();
+
+  // Vibrate on Android
+  if (navigator.vibrate) navigator.vibrate(40);
+
+  showScreen('wait-reveal');
+  document.getElementById('wr-msg').textContent = 'Locked in!';
+}
+
+// ══════════════════════════════════════════
+//  REVEAL
+// ══════════════════════════════════════════
+function showReveal(data) {
+  const qIdx = data.currentQ;
+  const q = QUESTIONS[qIdx];
+  if (!q) return;
+
+  const correctIdx = data.correctAnswer !== undefined ? data.correctAnswer : q.correct;
+  const isCorrect = myChoice === correctIdx;
+
+  // Score from Firebase (host calculated it)
+  const myFbData = data.scores ? Object.values(data.scores).find(s => s.name === playerName) : null;
+  const newScore = myFbData ? myFbData.score : myScore;
+  const pts = newScore - myScore;
+  myScore = newScore;
+
+  if (isCorrect) {
+    myCorrect++;
+    if (allinDecision) myAllinWins++;
+  }
+
+  const myStreak = myFbData?.streak || 0;
+  if (myStreak > myBestStreak) myBestStreak = myStreak;
+
+  // Flash + haptics
+  triggerFlash(isCorrect ? 'rgba(0,255,136,.28)' : 'rgba(255,45,85,.22)');
+  if (navigator.vibrate) navigator.vibrate(isCorrect ? [30,40,80] : [80,30,80]);
+
+  // Badge pop
+  showBadge(isCorrect);
+
+  // Sound
+  if (isCorrect) playCorrectSound(); else playWrongSound();
+
+  // Fill result screen
+  document.getElementById('result-icon').textContent = isCorrect ? '✅' : '❌';
+  document.getElementById('result-label').textContent = isCorrect ? 'CORRECT! 🔥' : 'Wrong answer';
+  document.getElementById('result-label').style.color = isCorrect ? 'var(--green)' : 'var(--red)';
+  document.getElementById('result-answer').textContent = q.options[correctIdx];
+  document.getElementById('result-fact').textContent = q.fact || '';
+  document.getElementById('result-pts').textContent = pts > 0 ? `+${pts}` : (pts < 0 ? pts : '+0');
+  document.getElementById('result-pts').style.color = pts > 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('result-total').textContent = myScore;
+
+  const streakEl = document.getElementById('result-streak');
+  streakEl.textContent = myStreak >= 3 ? `🔥 ${myStreak} in a row!` : '';
+
+  setTimeout(() => showScreen('result-screen'), 750);
+}
+
+function showBadge(isCorrect) {
+  const overlay = document.getElementById('badge-overlay');
+  const badge = document.getElementById('badge-text');
+  badge.className = 'result-badge ' + (isCorrect ? 'good' : 'bad');
+  badge.textContent = isCorrect ? '✓ CORRECT' : '✗ WRONG';
+  overlay.className = 'result-badge-overlay show';
+  setTimeout(() => {
+    overlay.className = 'result-badge-overlay hide';
+    setTimeout(() => overlay.className = 'result-badge-overlay', 400);
+  }, 680);
+}
+
+// ══════════════════════════════════════════
+//  FINAL
+// ══════════════════════════════════════════
+function showFinal(data) {
+  const scores = data.scores || {};
+  const sorted = Object.values(scores).sort((a,b)=>(b.score||0)-(a.score||0));
+  const myRank = sorted.findIndex(p => p.name === playerName) + 1;
+
+  document.getElementById('final-rank').textContent = `#${myRank}`;
+  document.getElementById('final-name').textContent = playerName;
+  document.getElementById('final-score').textContent = `${myScore} pts`;
+  document.getElementById('fstat-correct').textContent = myCorrect;
+  document.getElementById('fstat-streak').textContent = myBestStreak;
+  document.getElementById('fstat-allin').textContent = myAllinWins;
+
+  const emojis = ['🥇','🥈','🥉'];
+  document.getElementById('final-ranking-list').innerHTML = sorted.slice(0,8).map((p,i) =>
+    `<div class="final-row ${p.name===playerName?'me':''}">
+      <div class="final-row-pos">${emojis[i]||i+1}</div>
+      <div class="final-row-avatar">${p.avatar||'🎤'}</div>
+      <div class="final-row-name">${escHtml(p.name)}</div>
+      <div class="final-row-streak">${(p.streak||0)>=3?'🔥':''}</div>
+    </div>`
+  ).join('');
+
+  showScreen('final-screen');
+  if (myRank === 1) playWinSound();
+  else if (myRank <= 3) playFanfare();
+}
+
+// ══════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function triggerFlash(color) {
+  const f = document.getElementById('flash');
+  f.style.background = color; f.classList.add('on');
+  setTimeout(() => f.classList.remove('on'), 200);
+}
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ══════════════════════════════════════════
+//  AUDIO — all synth, no external files
+// ══════════════════════════════════════════
+function playSelectSound() {
+  const ac=getAC(), o=ac.createOscillator(), g=ac.createGain();
+  o.connect(g);g.connect(ac.destination);o.type='sine';o.frequency.value=520;
+  g.gain.setValueAtTime(.16,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.12);
+  o.start();o.stop(ac.currentTime+.12);
+}
+
+// ✅ CORRECT — bright ascending major chord arpeggio + trap kick
+function playCorrectSound() {
+  const ac=getAC();
+  [523,659,784,1047].forEach((f,i) => {
+    const o=ac.createOscillator(),g=ac.createGain();
+    o.connect(g);g.connect(ac.destination);o.type='triangle';o.frequency.value=f;
+    const d=i*.07;
+    g.gain.setValueAtTime(.26,ac.currentTime+d);
+    g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d+.38);
+    o.start(ac.currentTime+d);o.stop(ac.currentTime+d+.42);
+  });
+  // kick
+  const k=ac.createOscillator(),kg=ac.createGain();
+  k.connect(kg);kg.connect(ac.destination);k.type='sine';
+  k.frequency.setValueAtTime(180,ac.currentTime);k.frequency.exponentialRampToValueAtTime(40,ac.currentTime+.12);
+  kg.gain.setValueAtTime(.6,ac.currentTime);kg.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.15);
+  k.start();k.stop(ac.currentTime+.15);
+  // sparkle
+  const s=ac.createOscillator(),sg=ac.createGain();
+  s.connect(sg);sg.connect(ac.destination);s.type='sine';
+  s.frequency.value=2093;
+  sg.gain.setValueAtTime(.1,ac.currentTime+.22);sg.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.52);
+  s.start(ac.currentTime+.22);s.stop(ac.currentTime+.52);
+}
+
+// ❌ WRONG — harsh two-layer sawtooth buzzer + thump
+function playWrongSound() {
+  const ac=getAC();
+  const o1=ac.createOscillator(),g1=ac.createGain();
+  o1.connect(g1);g1.connect(ac.destination);o1.type='sawtooth';
+  o1.frequency.setValueAtTime(350,ac.currentTime);o1.frequency.exponentialRampToValueAtTime(80,ac.currentTime+.55);
+  g1.gain.setValueAtTime(.5,ac.currentTime);g1.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.55);
+  o1.start();o1.stop(ac.currentTime+.55);
+
+  const o2=ac.createOscillator(),g2=ac.createGain();
+  o2.connect(g2);g2.connect(ac.destination);o2.type='square';
+  o2.frequency.setValueAtTime(372,ac.currentTime);o2.frequency.exponentialRampToValueAtTime(90,ac.currentTime+.5);
+  g2.gain.setValueAtTime(.22,ac.currentTime);g2.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.5);
+  o2.start();o2.stop(ac.currentTime+.5);
+
+  const t=ac.createOscillator(),tg=ac.createGain();
+  t.connect(tg);tg.connect(ac.destination);t.type='sine';
+  t.frequency.setValueAtTime(120,ac.currentTime);t.frequency.exponentialRampToValueAtTime(40,ac.currentTime+.08);
+  tg.gain.setValueAtTime(.65,ac.currentTime);tg.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.1);
+  t.start();t.stop(ac.currentTime+.1);
+}
+
+// ⚡ LEGENDARY
+function playLegendaryTone() {
+  const ac=getAC();
+  [220,277,330,440,660,880].forEach((f,i) => {
+    const o=ac.createOscillator(),g=ac.createGain();
+    o.connect(g);g.connect(ac.destination);o.type=i<3?'sawtooth':'triangle';o.frequency.value=f;
+    const d=i*.08;
+    g.gain.setValueAtTime(.13,ac.currentTime+d);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d+.5);
+    o.start(ac.currentTime+d);o.stop(ac.currentTime+d+.55);
+  });
+}
+
+// 🏆 WIN / FANFARE
+function playWinSound() {
+  const ac=getAC();
+  [523,659,784,1047,784,1047,1319].forEach((f,i) => {
+    const o=ac.createOscillator(),g=ac.createGain();
+    o.connect(g);g.connect(ac.destination);o.type='triangle';o.frequency.value=f;
+    const d=i*.1;
+    g.gain.setValueAtTime(.22,ac.currentTime+d);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d+.55);
+    o.start(ac.currentTime+d);o.stop(ac.currentTime+d+.6);
+  });
+}
+function playFanfare() {
+  const ac=getAC();
+  [523,659,784].forEach((f,i) => {
+    const o=ac.createOscillator(),g=ac.createGain();
+    o.connect(g);g.connect(ac.destination);o.type='triangle';o.frequency.value=f;
+    const d=i*.1;
+    g.gain.setValueAtTime(.18,ac.currentTime+d);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d+.45);
+    o.start(ac.currentTime+d);o.stop(ac.currentTime+d+.5);
+  });
+}
+</script>
+</body>
+</html>
